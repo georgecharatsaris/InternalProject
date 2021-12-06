@@ -1,0 +1,18 @@
+version: '3'
+services:
+  spark:
+    build: .
+    volumes:
+      - ./scripts/:/home/project/scripts
+      - ../resources:/home/project/resources
+  postgresql:
+    image: 'postgres:latest'
+    environment:
+      - POSTGRES_PASSWORD=67930
+  pgadmin:
+    image: 'dpage/pgadmin4'
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=user@user.com
+      - PGADMIN_DEFAULT_PASSWORD=user
+    ports:
+      - '8080:80'
