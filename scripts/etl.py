@@ -1,6 +1,6 @@
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as f
-from pyspark.sql.types import IntegerType, TimestampType, DecimalType
+from pyspark.sql.types import IntegerType, TimestampType, DecimalType, StringType
 from pyspark.sql.window import Window
 import configparser
 
@@ -21,7 +21,8 @@ def cast_to_type(df):
         .withColumn("floor", f.col("floor").cast(IntegerType())) \
         .withColumn("id", f.col("id").cast(IntegerType())) \
         .withColumn("number", f.col("number").cast(IntegerType())) \
-        .withColumn("timestamp", f.col("timestamp").cast(TimestampType()))
+        .withColumn("timestamp", f.col("timestamp").cast(TimestampType())) \
+        .withColumn("parking_cards", f.concat(f.col("parking_cards").cast(StringType())))
 
 def further_preprocessing(df, window):
 
