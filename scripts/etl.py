@@ -28,7 +28,9 @@ def further_preprocessing(df, window):
 
     print("Creating important columns...")
 
-    return df.withColumn("year", f.year(df.timestamp))\
+    return df.withColumn("lag_status", f.lag("status",1).over(window)) \
+        .filter(f.col("status") != f.col("lag_status")) \
+        .withColumn("year", f.year(df.timestamp))\
         .withColumn("month", f.month(df.timestamp))\
         .withColumn("week_day", f.dayofweek(df.timestamp))\
         .withColumn("day_of_year", f.dayofyear(df.timestamp))\
@@ -46,10 +48,13 @@ def further_preprocessing(df, window):
         .withColumn("minute_diff", f.floor((f.col("time_diff") - (f.col("day_diff")*86400) - (f.col("hour_diff")*3600))/60).cast(IntegerType())) \
         .withColumn("second_diff", f.round((f.col("time_diff") - (f.col("day_diff")*86400) - (f.col("hour_diff")*3600) - (f.col("minute_diff")*60)),3).cast(IntegerType())) \
         .withColumn("timestamp_diff", f.concat(f.col("day_diff"), f.lit(" "), f.col("hour_diff"), f.lit(":"), f.col("minute_diff"), f.lit(":"), f.col("second_diff"))) \
-        .withColumn("time_stay", f.when(f.col("status") == "BUSY", f.col("time_diff")).otherwise(None)) \
-        .withColumn("time_diff", f.when(f.col("status") == "NOT_CALIBRATED", f.lit(0)) \
+        .withColumn("time_stay", f.when(f.col("status") == "BUSY", f.col("time_diff")).otherwise(f.lit(None))) \
+        .withColumn("time_diff", f.when(f.col("status") == "NOT_CALIBRATED", None) \
+        .when(f.col("lag_status") == "NOT_CALIBRATED", None) \
         .otherwise(f.col("time_diff"))) \
-        .withColumn("timestamp_diff", f.when(f.col("status") == "NOT_CALIBRATED", f.lit(0)) \
+        .withColumn("timestamp_diff", f.when(f.col("status") == "NOT_CALIBRATED", None) \
+        .when(f.col("lag_status") == "NOT_CALIBRATED", None) \
+        .when(f.col("time_diff").isNull(), None) \
         .otherwise(f.col("timestamp_diff")))
 
 def drop_short_stays(df, window):
@@ -57,7 +62,28 @@ def drop_short_stays(df, window):
     print("Dropping short stays...")
 
     return df.withColumn("lead_time_diff", f.lead("time_diff", 1).over(window)) \
-        .filter((f.col("time_diff") > 60) & (f.col("status") == "BUSY")).filter(f.col("lead_time_diff") > 60)
+        .filter(((f.col("time_diff") > 60) & (f.col("lead_time_diff") > 60)) | ((f.col("time_diff") < 60) & (f.col("lag_status") == "FREE")) \
+                | ((f.col("lead_time_diff") < 60) & (f.col("status") == "FREE")))
+
+def recalculating_times(df):
+
+    print("Recalculating time differences...")
+
+    return df.withColumn("new_time_diff", (f.col("time_stop") - f.col("time_start")).cast(IntegerType())) \
+        .withColumn("new_time_diff_lag", f.lag("time_diff", -1).over(window)) \
+        .withColumn("new_day_diff", (f.col("time_diff")/86400).cast(IntegerType())) \
+        .withColumn("new_hour_diff", f.floor((f.col("time_diff") - (f.col("day_diff")*86400))/3600).cast(IntegerType())) \
+        .withColumn("new_minute_diff", f.floor((f.col("time_diff") - (f.col("day_diff")*86400) - (f.col("hour_diff")*3600))/60).cast(IntegerType())) \
+        .withColumn("new_second_diff", f.round((f.col("time_diff") - (f.col("day_diff")*86400) - (f.col("hour_diff")*3600) - (f.col("minute_diff")*60)),3).cast(IntegerType())) \
+        .withColumn("new_timestamp_diff", f.concat(f.col("day_diff"), f.lit(" "), f.col("hour_diff"), f.lit(":"), f.col("minute_diff"), f.lit(":"), f.col("second_diff"))) \
+        .withColumn("new_time_stay", f.when(f.col("status") == "BUSY", f.col("time_diff")).otherwise(f.lit(None))) \
+        .withColumn("new_time_diff", f.when(f.col("status") == "NOT_CALIBRATED", None) \
+        .when(f.col("lag_status") == "NOT_CALIBRATED", None) \
+        .otherwise(f.col("time_diff"))) \
+        .withColumn("timestamp_diff", f.when(f.col("status") == "NOT_CALIBRATED", None) \
+        .when(f.col("lag_status") == "NOT_CALIBRATED", None) \
+        .when(f.col("time_diff").isNull(), None) \
+        .otherwise(f.col("timestamp_diff")))
 
 if __name__ == "__main__":
 
@@ -80,7 +106,7 @@ if __name__ == "__main__":
     link_file = f"wasbs://{container}@{storage_account}.blob.core.windows.net/*.json"
     window = Window.partitionBy(f.col("id")).orderBy(f.col("timestamp"))
 
-    df = drop_short_stays(further_preprocessing(cast_to_type(load_data(spark)), window), window)
+    df = recalculating_times(drop_short_stays(further_preprocessing(cast_to_type(load_data(spark)), window), window))
 
     df.show(5, truncate=False)
     df.printSchema()
