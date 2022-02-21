@@ -1,7 +1,7 @@
 FROM ubuntu:latest
 
-RUN apt-get update \
-    && apt-get upgrade \
+RUN apt-get -y update \
+    && apt-get -y upgrade \
     && apt -y install wget
 
 RUN apt-get -y install openjdk-8-jdk-headless
