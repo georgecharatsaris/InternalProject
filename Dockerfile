@@ -17,7 +17,7 @@ ENV PATH=$PATH:$SPARK_HOME/bin
 ENV PYSPARK_PYTHON=/usr/bin/python3
 ENV PYSPARK_DRIVER_PYTHON=/usr/bin/python3
  
-COPY /jars/*.jar /opt/spark/jars
+COPY /jars/*.jar /opt/spark/jars/
 
 WORKDIR /home/project
 
