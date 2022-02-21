@@ -15,8 +15,4 @@ services:
       - PGADMIN_DEFAULT_EMAIL=user@user.com
       - PGADMIN_DEFAULT_PASSWORD=user
     ports:
-<<<<<<< HEAD
-      - '8089:80'
-=======
-      - '8089:80'
->>>>>>> 15da82171bbc50f178eaae2c0b20b05c2a131b2f
+      - '8888:80'
